@@ -21,22 +21,27 @@ from django.http import HttpResponse
 
 class NotificationType(Enum):
     Joined_Ride = 0
-    New_Ride_Available = 1
+    Accept_Join_Ride = 1
+    New_Ride_Available = 2
 
 class SendNotificationResult(Enum):
     Error = 0
     Success = 1
     Driver_Not_Logged_In = 2
 
-def sendNotification(message, notificationType, driver):
+
+
+def sendNotification(message, notificationType, ride, related_user_id, toUser):
     try:
-        driver_device=Device.objects.get(user=driver)
+        driver_device=Device.objects.get(user=toUser)
     except Device.DoesNotExist:
         # driver is not logged in
         return SendNotificationResult.Driver_Not_Logged_In
     data = {
         "message": message,
         "type": notificationType.name,
+        "ride_id": ride.id,
+        "asking_user": related_user_id,
     }
     payload = {'to': driver_device.device_id, 'data': data, }
     r = requests.post("https://gcm-http.googleapis.com/gcm/send",
@@ -101,7 +106,27 @@ class RideViewSet(viewsets.ModelViewSet):
         serializer.save(driver=self.request.user)
 
     @detail_route(methods=['post'], permission_classes=[permissions.IsAuthenticated],)
-    def attach(self, request, pk=None):
+    def driverApproval(self, request, pk=None):
+        try:
+            asking_user_id = request.DATA.get('asking_user', '0')
+            askingUser = User.objects.get(id=asking_user_id)
+        except User.DoesNotExist:
+            return HttpResponseBadRequest("asking user doesn't exists")
+        ride = self.get_object()
+
+        # sending notification back to user for approval
+        result = sendNotification("You are in "+str(ride.driver.username) + "'s ride! ", NotificationType.Accept_Join_Ride, ride, 5, askingUser)
+
+        if result == SendNotificationResult.Success:
+            ride.passengers.add(askingUser)
+            ride.num_of_spots = ride.num_of_spots - 1
+            ride.save()
+
+        return HttpResponse("Approved succesfully")
+
+
+    @detail_route(methods=['post'], permission_classes=[permissions.IsAuthenticated],)
+    def askToJoinRide(self, request, pk=None):
         ride = self.get_object()
 
         # Check if the the user who attempts to join the the driver
@@ -118,20 +143,26 @@ class RideViewSet(viewsets.ModelViewSet):
             if ride in my_rides:
                 return HttpResponseBadRequest("You are already in this ride.")
             else:
-
-                result = sendNotification("someone joined your ride", NotificationType.Joined_Ride, ride.driver)
-
+                user_id = self.request.user.id
+                user = User.objects.get(id=user_id)
+                result = sendNotification(str(user.username) + " wants to join your ride to " + str(ride.destination),
+                                          NotificationType.Joined_Ride, ride, user_id, ride.driver)
                 if result == SendNotificationResult.Success:
-                    ride.passengers.add(self.request.user)
-                    ride.num_of_spots = ride.num_of_spots - 1
-                    ride.save()
-                    return HttpResponse("Joined ride succesfully")
-
+                    return HttpResponse("You asked to join this ride, you will get a notification to approve")
                 if result == SendNotificationResult.Driver_Not_Logged_In:
-                    ride.passengers.add(self.request.user)
-                    ride.num_of_spots = ride.num_of_spots - 1
-                    ride.save()
-                    return HttpResponse("Joined ride succesfully, driver is currently not logged in")
+                    return HttpResponse("You asked to join this ride, you will get a notification to approve. Driver currently not logged in")
+
+                # if result == SendNotificationResult.Success:
+                #     ride.passengers.add(self.request.user)
+                #     ride.num_of_spots = ride.num_of_spots - 1
+                #     ride.save()
+                #     return HttpResponse("Joined ride succesfully")
+                #
+                # if result == SendNotificationResult.Driver_Not_Logged_In:
+                #     ride.passengers.add(self.request.user)
+                #     ride.num_of_spots = ride.num_of_spots - 1
+                #     ride.save()
+                #     return HttpResponse("Joined ride succesfully, driver is currently not logged in")
 
 
 

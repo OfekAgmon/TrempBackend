@@ -21,7 +21,8 @@ class IsCreationOrIsAuthenticated(permissions.BasePermission):
             else:
                 return False
         else:
-            return True
+            if request.method in permissions.SAFE_METHODS:
+                return True
 
 
 class IsGetOrIsAuthenticated(permissions.BasePermission):
@@ -33,4 +34,5 @@ class IsGetOrIsAuthenticated(permissions.BasePermission):
             else:
                 return False
         else:
-            return True
+            if request.method in permissions.SAFE_METHODS:
+                return True
