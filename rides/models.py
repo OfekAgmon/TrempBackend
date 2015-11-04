@@ -6,6 +6,10 @@ import datetime
 from rest_framework.authtoken.models import Token
 
 
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    phone_number = models.CharField(max_length=15)
+
 class Destination(models.Model):
     name=models.CharField(max_length=30)
 
@@ -16,6 +20,8 @@ class UsualRide(models.Model):
     num_of_spots=models.IntegerField()
     mid_destinations=models.ManyToManyField(Destination, related_name='usual_rides_as_middle_destination')
 
+
+
 class Ride(models.Model):
     driver = models.ForeignKey('auth.User', related_name='rides_as_driver')
     destination=models.ForeignKey(Destination, related_name='rides_as_final_destination')
@@ -25,9 +31,15 @@ class Ride(models.Model):
     passengers=models.ManyToManyField('auth.User', related_name="rides_as_passenger")
     mid_destinations=models.ManyToManyField(Destination, related_name='rides_as_middle_destination')
 
+class PendingRequest(models.Model):
+    driver = models.ForeignKey('auth.User', related_name='driver_pending_requests')
+    passenger = models.ForeignKey('auth.User', related_name='passenger_pending_requests')
+    ride = models.ForeignKey(Ride)
+
 @receiver(post_save, sender=User)
-def create_auth_token(sender, instance=None, created=False, **kwargs):
+def handle_user_save(sender, instance=None, created=False, **kwargs):
     if created:
+        UserProfile.objects.create(user=instance)
         Token.objects.create(user=instance)
 
 

@@ -1,6 +1,7 @@
-from rides.models import Ride, Destination, Device, UsualRide
+from rides.models import Ride, Destination, Device, UsualRide, PendingRequest
 from django.contrib.auth.models import User
-from rides.serializers import UserSerializer, DestinationSerializer, RideSerializer, DeviceSerializer, UsualRideSerializer
+from rides.serializers import UserSerializer, DestinationSerializer, RideSerializer, DeviceSerializer, \
+    UsualRideSerializer, PendingRequestSerializer
 from rest_framework.decorators import detail_route, list_route
 from rides.permissions import IsCreationOrIsAuthenticated
 from rides.permissions import IsGetOrIsAuthenticated
@@ -22,7 +23,8 @@ from django.http import HttpResponse
 class NotificationType(Enum):
     Joined_Ride = 0
     Accept_Join_Ride = 1
-    New_Ride_Available = 2
+    Refuse_Join_Ride = 2
+    New_Ride_Available = 3
 
 class SendNotificationResult(Enum):
     Error = 0
@@ -121,8 +123,26 @@ class RideViewSet(viewsets.ModelViewSet):
             ride.passengers.add(askingUser)
             ride.num_of_spots = ride.num_of_spots - 1
             ride.save()
+            return HttpResponse("Approved succesfully")
 
-        return HttpResponse("Approved succesfully")
+
+
+    @detail_route(methods=['post'], permission_classes=[permissions.IsAuthenticated],)
+    def driverRefuse(self, request, pk=None):
+        try:
+            asking_user_id = request.DATA.get('asking_user', '0')
+            askingUser = User.objects.get(id=asking_user_id)
+        except User.DoesNotExist:
+            return HttpResponseBadRequest("asking user doesn't exists")
+        ride = self.get_object()
+
+        # sending notification back to user for approval
+        result = sendNotification(str(ride.driver.username) + " couldn't add you to his ride", NotificationType.Refuse_Join_Ride, ride, 5, askingUser)
+
+        if result == SendNotificationResult.Success:
+            return HttpResponse("Refused succesfully")
+
+
 
 
     @detail_route(methods=['post'], permission_classes=[permissions.IsAuthenticated],)
@@ -145,24 +165,14 @@ class RideViewSet(viewsets.ModelViewSet):
             else:
                 user_id = self.request.user.id
                 user = User.objects.get(id=user_id)
-                result = sendNotification(str(user.username) + " wants to join your ride to " + str(ride.destination),
+                result = sendNotification(str(user.username) + " wants to join your ride to " + str(ride.destination.name),
                                           NotificationType.Joined_Ride, ride, user_id, ride.driver)
                 if result == SendNotificationResult.Success:
                     return HttpResponse("You asked to join this ride, you will get a notification to approve")
                 if result == SendNotificationResult.Driver_Not_Logged_In:
-                    return HttpResponse("You asked to join this ride, you will get a notification to approve. Driver currently not logged in")
+                    return HttpResponse("You asked to join this ride, you will get a notification to approve. "
+                                        "Driver currently not logged in")
 
-                # if result == SendNotificationResult.Success:
-                #     ride.passengers.add(self.request.user)
-                #     ride.num_of_spots = ride.num_of_spots - 1
-                #     ride.save()
-                #     return HttpResponse("Joined ride succesfully")
-                #
-                # if result == SendNotificationResult.Driver_Not_Logged_In:
-                #     ride.passengers.add(self.request.user)
-                #     ride.num_of_spots = ride.num_of_spots - 1
-                #     ride.save()
-                #     return HttpResponse("Joined ride succesfully, driver is currently not logged in")
 
 
 
@@ -231,6 +241,18 @@ class DestinationList(APIView):
         destinations = Destination.objects.all()
         serializer = DestinationSerializer(destinations, many=True)
         return Response(serializer.data)
+
+class PendingRequestsViewSet(viewsets.ModelViewSet):
+    queryset = PendingRequest.objects.all()
+    serializer_class = PendingRequestSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def perform_create(self, serializer):
+        serializer.save(passenger=self.request.user)
+
+    def get_queryset(self):
+        return PendingRequest.objects.filter(driver=self.request.user)
+
 
 
 
