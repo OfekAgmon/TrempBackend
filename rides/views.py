@@ -111,6 +111,7 @@ class RideViewSet(viewsets.ModelViewSet):
     def driverApproval(self, request, pk=None):
         try:
             asking_user_id = request.DATA.get('asking_user', '0')
+            ride_id = request.DATA.get('ride_id', '0')
             askingUser = User.objects.get(id=asking_user_id)
         except User.DoesNotExist:
             return HttpResponseBadRequest("asking user doesn't exists")
@@ -123,6 +124,8 @@ class RideViewSet(viewsets.ModelViewSet):
             ride.passengers.add(askingUser)
             ride.num_of_spots = ride.num_of_spots - 1
             ride.save()
+            instance = PendingRequest.objects.get(ride=ride_id, passenger=askingUser)
+            instance.delete()
             return HttpResponse("Approved succesfully")
 
 
@@ -131,6 +134,7 @@ class RideViewSet(viewsets.ModelViewSet):
     def driverRefuse(self, request, pk=None):
         try:
             asking_user_id = request.DATA.get('asking_user', '0')
+            ride_id = request.DATA.get('ride_id', '0')
             askingUser = User.objects.get(id=asking_user_id)
         except User.DoesNotExist:
             return HttpResponseBadRequest("asking user doesn't exists")
@@ -140,6 +144,8 @@ class RideViewSet(viewsets.ModelViewSet):
         result = sendNotification(str(ride.driver.username) + " couldn't add you to his ride", NotificationType.Refuse_Join_Ride, ride, 5, askingUser)
 
         if result == SendNotificationResult.Success:
+            instance = PendingRequest.objects.get(ride=ride_id, passenger=askingUser)
+            instance.delete()
             return HttpResponse("Refused succesfully")
 
 
@@ -152,6 +158,18 @@ class RideViewSet(viewsets.ModelViewSet):
         # Check if the the user who attempts to join the the driver
         if self.request.user == ride.driver:
             return HttpResponseBadRequest("You are the ride's driver.")
+
+        # Check if there is a pending request to this ride from this user
+
+        try:
+            instance = PendingRequest.objects.get(ride=ride.id, passenger=self.request.user)
+        except PendingRequest.DoesNotExist:
+            instance = None
+
+        if instance is not None:
+            return HttpResponseBadRequest("You already asked to join this ride")
+
+
 
         # Check if there is no more spots
         if ride.num_of_spots == 0:
@@ -172,6 +190,7 @@ class RideViewSet(viewsets.ModelViewSet):
                 if result == SendNotificationResult.Driver_Not_Logged_In:
                     return HttpResponse("You asked to join this ride, you will get a notification to approve. "
                                         "Driver currently not logged in")
+
 
 
 
