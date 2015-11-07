@@ -1,7 +1,7 @@
 from rides.models import Ride, Destination, Device, UsualRide, PendingRequest
 from django.contrib.auth.models import User
 from rides.serializers import UserSerializer, DestinationSerializer, RideSerializer, DeviceSerializer, \
-    UsualRideSerializer, PendingRequestSerializer
+    UsualRideSerializer, PendingRequestPostSerializer, PendingRequestGetSerializer
 from rest_framework.decorators import detail_route, list_route
 from rides.permissions import IsCreationOrIsAuthenticated
 from rides.permissions import IsGetOrIsAuthenticated
@@ -169,8 +169,6 @@ class RideViewSet(viewsets.ModelViewSet):
         if instance is not None:
             return HttpResponseBadRequest("You already asked to join this ride")
 
-
-
         # Check if there is no more spots
         if ride.num_of_spots == 0:
             return HttpResponseBadRequest("Ride is already full.")
@@ -263,8 +261,14 @@ class DestinationList(APIView):
 
 class PendingRequestsViewSet(viewsets.ModelViewSet):
     queryset = PendingRequest.objects.all()
-    serializer_class = PendingRequestSerializer
     permission_classes = (permissions.IsAuthenticated,)
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return PendingRequestPostSerializer
+        if self.action == 'list':
+            return PendingRequestGetSerializer
+
 
     def perform_create(self, serializer):
         serializer.save(passenger=self.request.user)

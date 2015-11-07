@@ -19,6 +19,7 @@ class CreateableSlugRelatedField(serializers.SlugRelatedField):
         return model.objects.create(**{self.slug_field: data})
 
 class RideSerializer(serializers.ModelSerializer):
+
     destination = CreateableSlugRelatedField(
         slug_field='name',
         queryset=Destination.objects.all()
@@ -95,18 +96,43 @@ class DeviceSerializer(serializers.ModelSerializer):
         fields = ('device_id', )
         read_only_fields = ('user', )
 
-class PendingRequestSerializer(serializers.ModelSerializer):
+
+# PendingRequests Serizlizers
+
+
+class PendingRequestPostSerializer(serializers.ModelSerializer):
 
     driver = serializers.SlugRelatedField(
         slug_field='username',
         queryset=User.objects.all()
     )
 
+    passenger = serializers.SlugRelatedField(
+        slug_field='username',
+        read_only=True,
+    )
+
     class Meta:
         model = PendingRequest
-        fields = ('driver', 'ride', )
-        read_only_fields = ('passenger', )
+        fields = ('passenger', 'driver', 'ride', )
+        read_only_fields = ('passenger',)
 
+
+class PendingRequestGetSerializer(serializers.ModelSerializer):
+
+    ride = RideSerializer()
+
+    driver = serializers.SlugRelatedField(
+        slug_field='username',
+        queryset=User.objects.all()
+    )
+
+    passenger = UserSerializer()
+
+    class Meta:
+        model = PendingRequest
+        fields = ('passenger', 'driver', 'ride', )
+        read_only_fields = ('passenger',)
 
 
 
