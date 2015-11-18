@@ -1,8 +1,7 @@
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
-from rides.models import Ride, Destination, Device, UsualRide, PendingRequest, UserProfile
+from rides.models import Ride, Device, UsualRide, PendingRequest, UserProfile
 from django.contrib.auth.models import User
-import json
 
 class CreateableSlugRelatedField(serializers.SlugRelatedField):
 
@@ -20,15 +19,15 @@ class CreateableSlugRelatedField(serializers.SlugRelatedField):
 
 class RideSerializer(serializers.ModelSerializer):
 
-    destination = CreateableSlugRelatedField(
-        slug_field='name',
-        queryset=Destination.objects.all()
-    )
-    mid_destinations = CreateableSlugRelatedField(
-        slug_field='name',
-        many=True,
-        queryset=Destination.objects.all()
-    )
+    # destination = CreateableSlugRelatedField(
+    #     slug_field='name',
+    #     queryset=Destination.objects.all()
+    # )
+    # mid_destinations = CreateableSlugRelatedField(
+    #     slug_field='name',
+    #     many=True,
+    #     queryset=Destination.objects.all()
+    # )
     driver = serializers.ReadOnlyField(source='driver.username')
 
     class Meta:
@@ -39,15 +38,6 @@ class RideSerializer(serializers.ModelSerializer):
 
 class UsualRideSerializer(serializers.ModelSerializer):
 
-    destination = CreateableSlugRelatedField(
-        slug_field='name',
-        queryset=Destination.objects.all()
-    )
-    mid_destinations = CreateableSlugRelatedField(
-        slug_field='name',
-        many=True,
-        queryset=Destination.objects.all()
-    )
     user = serializers.ReadOnlyField(source='user.username')
 
     class Meta:
@@ -64,6 +54,10 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ('id', 'username', 'first_name', 'last_name', 'password', 'phone_number', )
         read_only_fields = ('phone_number', )
         extra_kwargs = {'password': {'write_only': True}}
+
+    def init(self, *args, **kwargs):
+        super(UserSerializer, self).__init__(*args, **kwargs)
+        self.fields['username'].validators = []
 
     def create(self, validated_data):
         user = User(
@@ -82,12 +76,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = ('phone_number', )
-
-class DestinationSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Destination
-        fields = ('name',)
 
 class DeviceSerializer(serializers.ModelSerializer):
 

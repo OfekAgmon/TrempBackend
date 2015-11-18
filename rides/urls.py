@@ -16,6 +16,5 @@ router.register(r'pendingRequests', views.PendingRequestsViewSet)
 urlpatterns = [
     url(r'^', include(router.urls)),
     url(r'^api-token-auth/', views.obtain_auth_token_and_user),
-    url(r'^destinations/$', views.DestinationList.as_view()),
     url(r'^myRides/$', views.MyRides.as_view()),
 ]

@@ -1,6 +1,6 @@
-from rides.models import Ride, Destination, Device, UsualRide, PendingRequest
+from rides.models import Ride, Device, UsualRide, PendingRequest
 from django.contrib.auth.models import User
-from rides.serializers import UserSerializer, DestinationSerializer, RideSerializer, DeviceSerializer, \
+from rides.serializers import UserSerializer, RideSerializer, DeviceSerializer, \
     UsualRideSerializer, PendingRequestPostSerializer, PendingRequestGetSerializer
 from rest_framework.decorators import detail_route, list_route
 from rides.permissions import IsCreationOrIsAuthenticated
@@ -62,7 +62,8 @@ def sendNotification(message, notificationType, ride, related_user_id, toUser):
 
 class FullRideException(APIException):
     status_code = 409
-    default_detail = "This ride is already full."
+    # default_detail = "This ride is already full."
+    default_detail = "ההסעה מלאה"
 
 class DeviceViewSet(viewsets.ModelViewSet):
     queryset = Device.objects.all()
@@ -114,12 +115,13 @@ class RideViewSet(viewsets.ModelViewSet):
             ride_id = request.DATA.get('ride_id', '0')
             askingUser = User.objects.get(id=asking_user_id)
         except User.DoesNotExist:
-            return HttpResponseBadRequest("asking user doesn't exists")
+            # return HttpResponseBadRequest("asking user doesn't exists")
+            return HttpResponseBadRequest("המשתמש המבקש לא קיים")
         ride = self.get_object()
 
         # sending notification back to user for approval
-        result = sendNotification("You are in "+str(ride.driver.username) + "'s ride! ", NotificationType.Accept_Join_Ride, ride, 5, askingUser)
-
+        # result = sendNotification("You are in "+str(ride.driver.username) + "'s ride! ", NotificationType.Accept_Join_Ride, ride, 5, askingUser)
+        result = sendNotification(str(ride.driver.username)+" צירף אותך להסעה שלו! ", NotificationType.Accept_Join_Ride, ride, 5, askingUser)
         if result == SendNotificationResult.Success:
             ride.passengers.add(askingUser)
             ride.num_of_spots = ride.num_of_spots - 1
@@ -137,11 +139,13 @@ class RideViewSet(viewsets.ModelViewSet):
             ride_id = request.DATA.get('ride_id', '0')
             askingUser = User.objects.get(id=asking_user_id)
         except User.DoesNotExist:
-            return HttpResponseBadRequest("asking user doesn't exists")
+            # return HttpResponseBadRequest("asking user doesn't exists")
+            return HttpResponseBadRequest("המשתמש המבקש לא קיים")
         ride = self.get_object()
 
         # sending notification back to user for approval
-        result = sendNotification(str(ride.driver.username) + " couldn't add you to his ride", NotificationType.Refuse_Join_Ride, ride, 5, askingUser)
+        # result = sendNotification(str(ride.driver.username) + " couldn't add you to his ride", NotificationType.Refuse_Join_Ride, ride, 5, askingUser)
+        result = sendNotification(str(ride.driver.username) + " לא יכל להוסיף אותך להסעה שלו ", NotificationType.Refuse_Join_Ride, ride, 5, askingUser)
 
         if result == SendNotificationResult.Success:
             instance = PendingRequest.objects.get(ride=ride_id, passenger=askingUser)
@@ -157,7 +161,8 @@ class RideViewSet(viewsets.ModelViewSet):
 
         # Check if the the user who attempts to join the the driver
         if self.request.user == ride.driver:
-            return HttpResponseBadRequest("You are the ride's driver.")
+            # return HttpResponseBadRequest("You are the ride's driver.")
+            return HttpResponseBadRequest("אתה הנהג של ההסעה הזו!")
 
         # Check if there is a pending request to this ride from this user
 
@@ -167,27 +172,36 @@ class RideViewSet(viewsets.ModelViewSet):
             instance = None
 
         if instance is not None:
-            return HttpResponseBadRequest("You already asked to join this ride")
+            # return HttpResponseBadRequest("You already asked to join this ride")
+            return HttpResponseBadRequest("כבר ביקשת להצטרף להסעה הזו!")
 
         # Check if there is no more spots
         if ride.num_of_spots == 0:
-            return HttpResponseBadRequest("Ride is already full.")
+            # return HttpResponseBadRequest("Ride is already full.")
+            return HttpResponseBadRequest("ההסעה מלאה!")
         else:
             my_rides = self.request.user.rides_as_passenger.all()
 
             # Check if user is already in this ride
             if ride in my_rides:
-                return HttpResponseBadRequest("You are already in this ride.")
+                # return HttpResponseBadRequest("You are already in this ride.")
+                return HttpResponseBadRequest("אתה כבר נמצא בהסעה הזו!")
+
+
             else:
                 user_id = self.request.user.id
                 user = User.objects.get(id=user_id)
-                result = sendNotification(str(user.username) + " wants to join your ride to " + str(ride.destination.name),
+                # result = sendNotification(str(user.username) + " wants to join your ride to " + str(ride.destination),
+                #                           NotificationType.Joined_Ride, ride, user_id, ride.driver)
+                result = sendNotification(str(ride.destination) + " רוצה להצטרף להסעה שלך ל "+str(user.username),
                                           NotificationType.Joined_Ride, ride, user_id, ride.driver)
                 if result == SendNotificationResult.Success:
-                    return HttpResponse("You asked to join this ride, you will get a notification to approve")
+                    # return HttpResponse("You asked to join this ride, you will get a notification to approve")
+                    return HttpResponse("ביקשת להצטרף להסעה, אתה תקבל הודעה לאישור")
                 if result == SendNotificationResult.Driver_Not_Logged_In:
-                    return HttpResponse("You asked to join this ride, you will get a notification to approve. "
-                                        "Driver currently not logged in")
+                    # return HttpResponse("You asked to join this ride, you will get a notification to approve. "
+                    #                     "Driver currently not logged in")
+                    return HttpResponse("ביקשת להצטרף להסעה, אתה תקבל הוסעה לאישור. הנהג כרגע לא מחובר")
 
 
 
@@ -215,7 +229,8 @@ class ObtainAuthTokenAndUser(APIView):
             serializer.is_valid(raise_exception=True)
         except Exception:
             # wrong username or password
-            return HttpResponseBadRequest("Wrong username or password")
+            # return HttpResponseBadRequest("Wrong username or password")
+            return HttpResponseBadRequest("שם משתמש או סיסמא לא נכונים")
         user = serializer.validated_data['user']
         try:
             device_used = Device.objects.get(user=user)
@@ -228,7 +243,8 @@ class ObtainAuthTokenAndUser(APIView):
             user_serializer = UserSerializer(user)
             return Response({'token': token.key, 'user': user_serializer.data})
         else:
-            return HttpResponseBadRequest("User is logged in from another device")
+            # return HttpResponseBadRequest("User is logged in from another device")
+            return HttpResponseBadRequest("משתמש מחובר ממכשיר אחר")
 
 obtain_auth_token_and_user = ObtainAuthTokenAndUser.as_view()
 
@@ -249,15 +265,6 @@ class MyRides(APIView):
         serializer = RideSerializer(rides, many=True)
         return Response(serializer.data)
 
-
-
-class DestinationList(APIView):
-    permission_classes = (IsGetOrIsAuthenticated,)
-
-    def get(self, request):
-        destinations = Destination.objects.all()
-        serializer = DestinationSerializer(destinations, many=True)
-        return Response(serializer.data)
 
 class PendingRequestsViewSet(viewsets.ModelViewSet):
     queryset = PendingRequest.objects.all()

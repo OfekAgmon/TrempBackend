@@ -10,26 +10,25 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     phone_number = models.CharField(max_length=15)
 
-class Destination(models.Model):
-    name=models.CharField(max_length=30)
-
 class UsualRide(models.Model):
     user = models.ForeignKey('auth.User', related_name='usual_rides')
-    destination=models.ForeignKey(Destination, related_name='usual_rides_as_final_destination')
+    destination = models.CharField(max_length=100, default='')
     leaving_time=models.TimeField()
     num_of_spots=models.IntegerField()
-    mid_destinations=models.ManyToManyField(Destination, related_name='usual_rides_as_middle_destination')
+    mid_destinations = models.CharField(max_length=100, default='')
+
 
 
 
 class Ride(models.Model):
     driver = models.ForeignKey('auth.User', related_name='rides_as_driver')
-    destination=models.ForeignKey(Destination, related_name='rides_as_final_destination')
+    destination = models.CharField(max_length=100, default='')
     leaving_time=models.TimeField()
     leaving_date=models.DateField(default=datetime.date.today)
     num_of_spots=models.IntegerField()
     passengers=models.ManyToManyField('auth.User', related_name="rides_as_passenger")
-    mid_destinations=models.ManyToManyField(Destination, related_name='rides_as_middle_destination')
+    mid_destinations = models.CharField(max_length=100, default='')
+
 
 class PendingRequest(models.Model):
     driver = models.ForeignKey('auth.User', related_name='driver_pending_requests')
