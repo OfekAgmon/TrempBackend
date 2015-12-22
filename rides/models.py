@@ -18,8 +18,6 @@ class UsualRide(models.Model):
     mid_destinations = models.CharField(max_length=100, default='')
 
 
-
-
 class Ride(models.Model):
     driver = models.ForeignKey('auth.User', related_name='rides_as_driver')
     destination = models.CharField(max_length=100, default='')
@@ -28,6 +26,7 @@ class Ride(models.Model):
     num_of_spots=models.IntegerField()
     passengers=models.ManyToManyField('auth.User', related_name="rides_as_passenger")
     mid_destinations = models.CharField(max_length=100, default='')
+    leaving_spot = models.CharField(max_length=100, default='')
 
 
 class PendingRequest(models.Model):

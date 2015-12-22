@@ -1,3 +1,4 @@
+from lib2to3.pgen2 import driver
 from rides.models import Ride, Device, UsualRide, PendingRequest
 from django.contrib.auth.models import User
 from rides.serializers import UserSerializer, RideSerializer, DeviceSerializer, \
@@ -24,7 +25,7 @@ class NotificationType(Enum):
     Joined_Ride = 0
     Accept_Join_Ride = 1
     Refuse_Join_Ride = 2
-    New_Ride_Available = 3
+    Cancelled_Ride = 3
 
 class SendNotificationResult(Enum):
     Error = 0
@@ -102,11 +103,32 @@ class RideViewSet(viewsets.ModelViewSet):
     serializer_class = RideSerializer
     permission_classes = (permissions.IsAuthenticated,)
 
+
     def get_queryset(self):
-        return Ride.objects.filter(leaving_date=datetime.date.today)
+        if self.action == 'list':
+            return Ride.objects.filter(leaving_date=datetime.date.today).exclude(driver=self.request.user)
+        else:
+            return Ride.objects.all()
+
+
 
     def perform_create(self, serializer):
         serializer.save(driver=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        ride = self.get_object()
+        if not ride.passengers.all():
+            ride.delete()
+            return HttpResponse("ההסעה בוטלה בהצלחה")
+        else:
+            for p in ride.passengers.all():
+                message = "\u200F" + str(ride.driver.username) + " ביטל את ההסעה ל" + str(ride.destination)
+                result = sendNotification(message, NotificationType.Cancelled_Ride, ride, 5, p)
+                if result == SendNotificationResult.Success:
+                    ride.delete()
+                    return HttpResponse("ההסעה בוטלה בהצלחה")
+
+
 
     @detail_route(methods=['post'], permission_classes=[permissions.IsAuthenticated],)
     def driverApproval(self, request, pk=None):
@@ -121,14 +143,15 @@ class RideViewSet(viewsets.ModelViewSet):
 
         # sending notification back to user for approval
         # result = sendNotification("You are in "+str(ride.driver.username) + "'s ride! ", NotificationType.Accept_Join_Ride, ride, 5, askingUser)
-        result = sendNotification(str(ride.driver.username)+" צירף אותך להסעה שלו! ", NotificationType.Accept_Join_Ride, ride, 5, askingUser)
+        message = "\u200F" + str(ride.driver.username)+ " צירף אותך להסעה שלו! "
+        result = sendNotification(message, NotificationType.Accept_Join_Ride, ride, 5, askingUser)
         if result == SendNotificationResult.Success:
             ride.passengers.add(askingUser)
             ride.num_of_spots = ride.num_of_spots - 1
             ride.save()
             instance = PendingRequest.objects.get(ride=ride_id, passenger=askingUser)
             instance.delete()
-            return HttpResponse("Approved succesfully")
+            return HttpResponse("האישור התקבל בהצלחה")
 
 
 
@@ -145,12 +168,13 @@ class RideViewSet(viewsets.ModelViewSet):
 
         # sending notification back to user for approval
         # result = sendNotification(str(ride.driver.username) + " couldn't add you to his ride", NotificationType.Refuse_Join_Ride, ride, 5, askingUser)
-        result = sendNotification(str(ride.driver.username) + " לא יכל להוסיף אותך להסעה שלו ", NotificationType.Refuse_Join_Ride, ride, 5, askingUser)
+        message = "\u200F" + str(ride.driver.username) + " לא יכל להוסיף אותך להסעה שלו "
+        result = sendNotification(message, NotificationType.Refuse_Join_Ride, ride, 5, askingUser)
 
         if result == SendNotificationResult.Success:
             instance = PendingRequest.objects.get(ride=ride_id, passenger=askingUser)
             instance.delete()
-            return HttpResponse("Refused succesfully")
+            return HttpResponse("הסירוב התקבל בהצלחה")
 
 
 
@@ -193,7 +217,8 @@ class RideViewSet(viewsets.ModelViewSet):
                 user = User.objects.get(id=user_id)
                 # result = sendNotification(str(user.username) + " wants to join your ride to " + str(ride.destination),
                 #                           NotificationType.Joined_Ride, ride, user_id, ride.driver)
-                result = sendNotification(str(ride.destination) + " רוצה להצטרף להסעה שלך ל "+str(user.username),
+                message = "\u200F" + str(user.username) + " רוצה להצטרף להסעה שלך ל"+ str(ride.destination)
+                result = sendNotification(message,
                                           NotificationType.Joined_Ride, ride, user_id, ride.driver)
                 if result == SendNotificationResult.Success:
                     # return HttpResponse("You asked to join this ride, you will get a notification to approve")

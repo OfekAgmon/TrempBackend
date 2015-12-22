@@ -17,34 +17,6 @@ class CreateableSlugRelatedField(serializers.SlugRelatedField):
         model = self.get_queryset().model
         return model.objects.create(**{self.slug_field: data})
 
-class RideSerializer(serializers.ModelSerializer):
-
-    # destination = CreateableSlugRelatedField(
-    #     slug_field='name',
-    #     queryset=Destination.objects.all()
-    # )
-    # mid_destinations = CreateableSlugRelatedField(
-    #     slug_field='name',
-    #     many=True,
-    #     queryset=Destination.objects.all()
-    # )
-    driver = serializers.ReadOnlyField(source='driver.username')
-
-    class Meta:
-        model = Ride
-        fields = ('id', 'driver', 'destination', 'leaving_time', 'leaving_date',
-                  'num_of_spots', 'passengers', 'mid_destinations')
-        read_only_fields = ('id', 'driver', 'passengers', 'leaving_date', )
-
-class UsualRideSerializer(serializers.ModelSerializer):
-
-    user = serializers.ReadOnlyField(source='user.username')
-
-    class Meta:
-        model = UsualRide
-        fields = ('user', 'destination', 'leaving_time', 'num_of_spots', 'mid_destinations')
-        read_only_fields = ('user', )
-
 class UserSerializer(serializers.ModelSerializer):
 
     phone_number = serializers.CharField(source='userprofile.phone_number')
@@ -71,6 +43,29 @@ class UserSerializer(serializers.ModelSerializer):
         user.userprofile.phone_number = self.initial_data["phone_number"]
         user.userprofile.save()
         return user
+
+class RideSerializer(serializers.ModelSerializer):
+
+    # driver = serializers.ReadOnlyField(source='driver.username')
+    driver = UserSerializer(many=False, required=False)
+    passengers = UserSerializer(many=True, required=False)
+
+    class Meta:
+        model = Ride
+        fields = ('id', 'driver', 'destination', 'leaving_time', 'leaving_date',
+                  'num_of_spots', 'passengers', 'mid_destinations', 'leaving_spot')
+        read_only_fields = ('id', 'driver', 'passengers', 'leaving_date', )
+
+class UsualRideSerializer(serializers.ModelSerializer):
+
+    user = serializers.ReadOnlyField(source='user.username')
+
+    class Meta:
+        model = UsualRide
+        fields = ('user', 'destination', 'leaving_time', 'num_of_spots', 'mid_destinations')
+        read_only_fields = ('user', )
+
+
 
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
