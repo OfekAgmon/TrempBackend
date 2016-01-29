@@ -101,21 +101,17 @@ class PendingRequestPostSerializer(serializers.ModelSerializer):
         read_only_fields = ('passenger',)
 
 
+
 class PendingRequestGetSerializer(serializers.ModelSerializer):
 
     ride = RideSerializer()
 
-    driver = serializers.SlugRelatedField(
-        slug_field='username',
-        queryset=User.objects.all()
-    )
+    driver = UserSerializer()
 
     passenger = UserSerializer()
 
     class Meta:
         model = PendingRequest
         fields = ('passenger', 'driver', 'ride', )
-        read_only_fields = ('passenger',)
-
 
 
